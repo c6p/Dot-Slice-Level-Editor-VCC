@@ -94,29 +94,29 @@ export default class MarchingSquares {
     const getFirstTransparent = from => this.getFirstMatchingPixelTopDown(this.sourceContext, this.sourceCanvas, isTransparent, from);
     const paintOutline = (points) => paintPath(this.sourceContext, points, hex(OUTLINE));
 
-    let paths = []
-    //let path = [];
+    //let paths = []
+    let path = [];
     // Find first NonTransparent
     let pos = {x:0, y:0};
-    while (pos !== null) {
+    //while (pos !== null) {
       pos = getFirstNonTransparent(pos);
       //console.log("NON", pos, getData(pos))
-      if (pos === null) break;
-      if (isNotOutline(pos)) {
+      //if (pos === null) break;
+      //if (isNotOutline(pos)) {
         let points = this.walkPerimeter(pos.x, pos.y);
         paintOutline(points);
         //paths.push([pos.x, pos.y]);
-        let path = simplify(points, 1, true).map(({x,y})=>{return {x:x*scale-P, y:y*scale-P, index:0}});
-        paths.push(path);
-      }
+        path = simplify(points, 1, true).map(({x,y})=>{return {x:x*scale-P, y:y*scale-P, index:0}});
+        //paths.push(path);
+      //}
       //else
-      pos = getFirstTransparent(pos);
+      //pos = getFirstTransparent(pos);
       //console.log(pos, getData(pos))
-    }
+    //}
 
     // Return list of x and y positions
     //console.log(paths);
-    return paths;
+    return path;
   };
 
   getFirstMatchingPixelTopDown(context, canvas, predicate, from={x:0,y:0}) {

@@ -23,9 +23,9 @@ const Input = styled.input.attrs(props => ({
 
 const Label = styled.label`
   display: inline-block;
-  width: 25px;
-  height: 25px;
-  margin-right: 10px;
+  width: 15px;
+  height: 15px;
+  margin-right: 5px;
 `
 
 class ColorInput extends React.Component {
