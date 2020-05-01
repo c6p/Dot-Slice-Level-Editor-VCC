@@ -95,6 +95,7 @@ export default class MarchingSquares {
     const paintOutline = (points) => paintPath(this.sourceContext, points, hex(OUTLINE));
 
     let paths = []
+    //let path = [];
     // Find first NonTransparent
     let pos = {x:0, y:0};
     while (pos !== null) {
@@ -105,8 +106,8 @@ export default class MarchingSquares {
         let points = this.walkPerimeter(pos.x, pos.y);
         paintOutline(points);
         //paths.push([pos.x, pos.y]);
-        paths.push(simplify(points, 1, true).map(({x,y})=>{return {x:x*scale-P, y:y*scale-P, index:0}}));
-        //paths.push(points);
+        let path = simplify(points, 1, true).map(({x,y})=>{return {x:x*scale-P, y:y*scale-P, index:0}});
+        paths.push(path);
       }
       //else
       pos = getFirstTransparent(pos);

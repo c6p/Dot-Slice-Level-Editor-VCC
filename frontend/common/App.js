@@ -1,3 +1,4 @@
+import 'rc-slider/assets/index.css';
 import React from 'react';
 import styled from 'styled-components'
 import ColorInput from './ColorInput'
@@ -5,6 +6,16 @@ import MarchingSquares from './marchingSquares'
 import collide from 'line-circle-collision'
 import CustomVcc from '@withkoji/custom-vcc-sdk';
 import ReactTooltip from 'react-tooltip'
+import {Range, Handle} from 'rc-slider';
+
+const handle = (props) => {
+  const { value, dragging, index, ...rest } = props;
+  return (
+    <Handle style={{display: 'flex', justifyContent: 'center'}} key={index} value={value} {...rest}>
+      {dragging && <div style={{width: '4em', background: '#eeee', marginTop: '-1.5em', whiteSpace: 'nowrap', userSelect: 'none'}}>{value} ms</div>}
+    </Handle>
+  );
+};
 
 const Container = styled.div`
   position: relative;
@@ -43,6 +54,9 @@ const NumberInput = styled.input.attrs(props => ({
   width: 5rem;
   margin: 0.5em;
   padding: 0.5em;
+  &:disabled{
+    border-color: lightgray;
+  }
 `;
 
 const ButtonLabel = styled.label`
@@ -66,13 +80,17 @@ const Button = styled.button`
   font-family: inherit;
   font-size: 100%;
   border: 2px solid #666;
-  &:hover{
+  &:hover:enabled{
     background-color: #666;
     color: white;
   }
+  &:disabled{
+    color: lightgray;
+    border-color: lightgray;
+  }
 `;
 
-const Range = styled.input.attrs(props => ({
+const RangeInput = styled.input.attrs(props => ({
   type: "range",
 }))`
 `
@@ -88,6 +106,7 @@ function dataURLtoBlob(dataurl) {
 
 const GAME_SIZE = 1080;
 const SCALE = 4;
+const STEP = 50;
 
 class App extends React.Component {
   constructor(props) {
@@ -95,13 +114,13 @@ class App extends React.Component {
     this.customVcc = new CustomVcc();
     this.state = {
       obstacles: ['ffffff', '000000', 'd00c27', 'ffa000', 'fff22f', 'beff00', '32cd32', 'bbd6be', '7ef9ff', '34bbe6', '4355db', 'd23be7'].map((color, i) => {
-        let [disabled, on, off, startOff, tip] = [false, 500, 500, false, "CUSTOM COLOR-CODED OBSTACLE<br/>Visible according to on/off times<br/>Paint it for dynamic obstacles"];
+        let [disabled, period, cycles, tip] = [false, 5000, [(i-2)*500, (i-1)*500], "CUSTOM COLOR-CODED OBSTACLE<br/>Visible according to on/off times<br/>Paint it for dynamic obstacles"];
         if (i === 0) {
-          [disabled, on, off, startOff, tip] = [true, 0, 1000, true, "NO OBSTACLE<br/>Paint it to remove any obstacle"];
+          [disabled, period, cycles, tip] = [true, 1000, [1000, 1000], "NO OBSTACLE<br/>Paint it to remove any obstacle"];
         } else if (i === 1) {
-          [disabled, on, off, tip] = [true, 1000, 0, "SOLID OBSTACLE<br/>Paint it for always-on obstacles"];
+          [disabled, period, cycles, tip] = [true, 1000, [0, 1000], "SOLID OBSTACLE<br/>Paint it for always-on obstacles"];
         }
-        return { color, on, off, startOff, disabled, tip };
+        return { color, period, cycles, disabled, tip };
       }),
       selected: 0,
       brushRadius: 10,
@@ -200,7 +219,6 @@ class App extends React.Component {
       let ratio = Math.min(1024 / img.width, 1024 / img.height);
       const [w, h] = [img.width * ratio, img.height * ratio];
       const [x, y] = [(1080 - w) / 2, (1080 - h) / 2];
-      console.log(x, y, w, h)
       ctx.drawImage(img, 0, 0, img.width, img.height, x, y, w, h);
 
       if (onLoad)
@@ -209,17 +227,44 @@ class App extends React.Component {
     img.src = src;
   }
 
-  handleValue(e, key, val='value') {
-    let {obstacles, selected} = this.state;
-    obstacles[selected][key] = e.target[val];
+  setStateObstacles(obstacles) {
     this.setState(prevState => ({
       ...prevState,
       obstacles: [...obstacles]
     }))
   }
 
+  changePeriod(e) {
+    let {obstacles, selected} = this.state;
+    obstacles[selected].period = Math.floor(e.target.value / STEP) * STEP;
+    this.setStateObstacles(obstacles);
+  }
+  removeCycle() {
+    let {obstacles, selected} = this.state;
+    let o = obstacles[selected];
+    const len = o.cycles.length;
+    if (len <= 2)
+      return
+    o.cycles.splice(len-2, 2);
+    this.setStateObstacles(obstacles);
+  }
+  addCycle() {
+    let {obstacles, selected} = this.state;
+    let o = obstacles[selected];
+    const last = o.cycles[o.cycles.length-1];
+    if (last >= o.period)
+      return;
+    o.cycles.push(Math.max(o.period-500, ), o.period);
+    this.setStateObstacles(obstacles);
+  }
+  changeCycles(v) {
+    let {obstacles, selected} = this.state;
+    obstacles[selected].cycles = v;
+    this.setStateObstacles(obstacles);
+  }
+
   handleRadio(e) {
-    this.setState({selected: e.target.value}, () => console.log(this.state.selected));
+    this.setState({selected: e.target.value});
   }
 
    handleImage(e) {
@@ -229,7 +274,8 @@ class App extends React.Component {
   }
 
   saveLevel() {
-    let obstacles = this.state.obstacles.map(({on,off,startOff})=>{return {on,off,startOff,paths:[]}});
+    let obstacles = this.state.obstacles.map(({period,cycles})=>{return {period,cycles}});
+    /*let obstacles = this.state.obstacles.map(({period,cycles})=>{return {period,cycles,paths:[]}});
     for (let p of this.paths) {
       let obstacleIndex = p[1].index;
       let ops = obstacles[obstacleIndex].paths;
@@ -246,9 +292,10 @@ class App extends React.Component {
           opsa = ops[ops.length-1];
         }
       }
-    }
+    }*/
+    console.log({ image: this.state.image, obstacles, paths: this.paths });
 
-    let save = (url) => this.setState({ image: url, value: { image: url, obstacles } }, () => {
+    let save = (url) => this.setState({ image: url, value: { image: url, obstacles, paths: this.paths } }, () => {
       this.customVcc.change(this.state.value);
       this.customVcc.save();
     });
@@ -263,33 +310,47 @@ class App extends React.Component {
 
   render() {
     const { image, obstacles, selected, brushRadius } = this.state;
-    const {on,off,startOff,disabled,color} = obstacles[selected];
+    const {cycles,period,disabled,color} = obstacles[selected];
+    const railStyle = { backgroundColor: 'lightgray' };
     return (
       <Container>
         <Header>
           <ButtonLabel>Select Image<FileInput id="file" onChange={this.handleImage.bind(this)}></FileInput></ButtonLabel>
-          <Range min={3} max={64} value={brushRadius} onChange={(e) => this.setState({brushRadius: e.target.value})} data-tip="Brush size"></Range>
+          <RangeInput min={3} max={64} value={brushRadius} onChange={(e) => this.setState({ brushRadius: e.target.value })} data-tip="Brush size"></RangeInput>
           {this.state.obstacles.map((c, i) =>
             <ColorInput key={i} color={c.color} value={i} data-tip={c.tip}
-            checked={this.state.selected == i} onChange={this.handleRadio.bind(this)}
+              checked={this.state.selected == i} onChange={this.handleRadio.bind(this)}
             ></ColorInput>
           )}
-          <label data-tip="Time when obstacle is VISIBLE <br/>(in miliseconds)">On:<NumberInput value={on} disabled={disabled} onChange={(e) => this.handleValue(e, 'on')}></NumberInput></label>
-          <label data-tip="Time when obstacle is INVISIBLE <br/>(in miliseconds)">Off:<NumberInput value={off} disabled={disabled} onChange={(e) => this.handleValue(e, 'off')}></NumberInput></label>
-          <label data-tip="Whether INVISIBLE in the BEGINNING or NOT">Start Off:<Checkbox checked={startOff} disabled={disabled} onChange={(e) => this.handleValue(e, 'startOff', 'checked')}></Checkbox></label>
+          <label data-tip="Total period (ms)<br/>VISIBLE/INVISIBLE cycle">
+            <NumberInput value={period} min={STEP} max={10000} step={STEP} disabled={disabled} onChange={this.changePeriod.bind(this)}></NumberInput>
+          </label>
+          <Button disabled={disabled} onClick={this.removeCycle.bind(this)}
+          data-tip="Remove INVISIBLE/VISIBLE cycle from tail">-</Button>
+          <div style={{ display: 'inline-block', width: '300px' }}
+            data-tip="VISIBLE in painted time-range<br/>INVISIBLE on gray>">
+            <Range count={cycles.length} value={cycles} min={0} max={period} step={STEP} disabled={disabled}
+              onChange={this.changeCycles.bind(this)}
+              pushable handle={handle} trackStyle={[, railStyle,]} railStyle={railStyle} />
+          </div>
+          <Button disabled={disabled} onClick={this.addCycle.bind(this)}
+          data-tip="Add INVISIBLE/VISIBLE cycle to tail">+</Button>
           <Button onClick={this.saveLevel.bind(this)}>Save Level</Button>
         </Header>
         <Container>
-          <img src={image} style={{display: 'none'}} width={GAME_SIZE} height={GAME_SIZE}></img>
+          <img src={image} style={{ display: 'none' }} width={GAME_SIZE} height={GAME_SIZE}></img>
           <Canvas ref="canvas" width={GAME_SIZE} height={GAME_SIZE}></Canvas>
           <div style={{ position: 'absolute', width: `90vh`, height: `90vh`, backgroundColor: '#dddd' }}></div>
           <Canvas ref="outline" width={GAME_SIZE} height={GAME_SIZE} radius={brushRadius} color={color}
-          onMouseMove={this.paint.bind(this)} onMouseDown={this.paint.bind(this)} ></Canvas>
+            onMouseMove={this.paint.bind(this)} onMouseDown={this.paint.bind(this)} ></Canvas>
         </Container>
         <ReactTooltip multiline={true} />
       </Container>
     );
   }
 }
+//<label data-tip="Time when obstacle is VISIBLE <br/>(in miliseconds)">On:<NumberInput value={on} disabled={disabled} onChange={(e) => this.handleValue(e, 'on')}></NumberInput></label>
+//<label data-tip="Time when obstacle is INVISIBLE <br/>(in miliseconds)">Off:<NumberInput value={off} disabled={disabled} onChange={(e) => this.handleValue(e, 'off')}></NumberInput></label>
+//<label data-tip="Whether INVISIBLE in the BEGINNING or NOT">Start Off:<Checkbox checked={startOff} disabled={disabled} onChange={(e) => this.handleValue(e, 'startOff', 'checked')}></Checkbox></label>
 
 export default App;
