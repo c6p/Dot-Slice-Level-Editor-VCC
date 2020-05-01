@@ -98,6 +98,20 @@ const Ball = styled.div`
   border: solid 1px black;
 `
 
+const ColorPicker = styled.input.attrs(props => ({
+  type: "color",
+}))`
+  border: 2px solid #666;
+  border-radius: 3px;
+  margin: 0.2rem;
+  padding: 0.2rem;
+  background: #eee
+  &:hover:enabled{
+    background-color: #666;
+    color: white;
+  }
+`
+
 const RangeInput = styled.input.attrs(props => ({
   type: "range",
 }))`
@@ -137,6 +151,8 @@ class App extends React.Component {
       targetArea: 50,
       ballRadius: 30,
       balls: [30, 30, 15, 15, 15],
+      backgroundColor: '#333333',
+      showOutline: true,
       canvasSize: GAME_SIZE
     };
     this.ms = new MarchingSquares()
@@ -167,7 +183,7 @@ class App extends React.Component {
   componentDidMount() {
     this.customVcc.register('50%', '100vh');
     this.path = [];
-    this.setState({canvasSize: this.refs.outline.getBoundingClientRect().width});
+    this.setState({canvasSize: this.refs.canvas.getBoundingClientRect().width});
   }
 
   runMarchingSquares(point = undefined) {
@@ -302,7 +318,7 @@ class App extends React.Component {
   }
 
   saveLevel() {
-    const {willScale, targetArea, balls} = this.state;
+    const {willScale, targetArea, balls, backgroundColor} = this.state;
     let obstacles = this.state.obstacles.map(({period,cycles})=>{return {period,cycles}});
     /*let obstacles = this.state.obstacles.map(({period,cycles})=>{return {period,cycles,paths:[]}});
     for (let p of this.paths) {
@@ -322,9 +338,9 @@ class App extends React.Component {
         }
       }
     }*/
-    console.log({ image: this.state.image, obstacles, path: this.path, willScale, targetArea: targetArea/100, balls });
+    //console.log({ image: this.state.image, obstacles, path: this.path, willScale, targetArea: targetArea/100, balls, backgroundColor });
 
-    let save = (url) => this.setState({ image: url, value: { image: url, obstacles, path: this.path, willScale, targetArea: targetArea/100, balls } }, () => {
+    let save = (url) => this.setState({ image: url, value: { image: url, obstacles, path: this.path, willScale, targetArea: targetArea/100, balls, backgroundColor } }, () => {
       this.customVcc.change(this.state.value);
       this.customVcc.save();
     });
@@ -338,7 +354,7 @@ class App extends React.Component {
   }
 
   render() {
-    const { image, obstacles, selected, brushRadius, willScale, targetArea, ballRadius, balls, canvasSize} = this.state;
+    const { image, obstacles, selected, brushRadius, willScale, targetArea, ballRadius, balls, backgroundColor, showOutline, canvasSize} = this.state;
     const {cycles,period,disabled,color} = obstacles[selected];
     const railStyle = { backgroundColor: 'lightgray' };
     //const ratio = canvasSize / GAME_SIZE;
@@ -347,10 +363,10 @@ class App extends React.Component {
         <Header>
           <Button onClick={this.saveLevel.bind(this)}>Save Level</Button>
           <ButtonLabel>Select Image<FileInput id="file" onChange={this.handleImage.bind(this)}></FileInput></ButtonLabel>
+          <label data-tip="Show/Hide obstacle layer">Show Obstacle Layer?<Checkbox checked={showOutline} onChange={(e) => this.setState({ showOutline: e.target.checked})}></Checkbox></label>
+          <ColorPicker data-tip="Level background color" value={backgroundColor} onChange={e => this.setState({backgroundColor: e.target.value})}></ColorPicker>
           <label data-tip="Whether image will continuously<br/>scale to fill the level">Scaling?<Checkbox checked={willScale} onChange={(e) => this.setState({ willScale: e.target.checked})}></Checkbox></label>
           <RangeInput min={1} max={99} value={targetArea} onChange={(e) => this.setState({ targetArea: e.target.value })} data-tip="Target area % to pass level"></RangeInput>
-          <RangeInput min={5} max={40} value={ballRadius} onChange={(e) => this.setState({ ballRadius: e.target.value })} data-tip="Radius of dots to add"></RangeInput>
-          <Button onClick={this.addBall.bind(this)}>Add Ball</Button>
           <div>
           <RangeInput min={3} max={64} value={brushRadius} onChange={(e) => this.setState({ brushRadius: e.target.value })} data-tip="Brush size"></RangeInput>
           {this.state.obstacles.map((c, i) =>
@@ -374,17 +390,20 @@ class App extends React.Component {
           </div>
         </Header>
         <Container>
+          <div style={{ position: 'absolute', width: `80vh`, height: `80vh`, backgroundColor: backgroundColor }}></div>
           <img src={image} style={{ display: 'none' }} width={GAME_SIZE} height={GAME_SIZE}></img>
           <Canvas ref="canvas" width={GAME_SIZE} height={GAME_SIZE}></Canvas>
+          <div style={{ position: "absolute", display: showOutline ? 'block' : 'none'}}>
           <div style={{ position: 'absolute', width: `80vh`, height: `80vh`, backgroundColor: '#dddd' }}></div>
           <Canvas ref="outline" width={GAME_SIZE} height={GAME_SIZE} radius={brushRadius} color={color}
             onMouseMove={this.paint.bind(this)} onMouseDown={this.paint.bind(this)} ></Canvas>
+            </div>
         </Container>
         {
-        <Container style={{position: 'absolute', display: 'flex', flexFlow: 'column', alignItems: 'center', left: canvasSize }}
-          data-tip="Click on a ball to remove">
-            <h3>Balls:</h3>
-          {balls.map((b,i) => <Ball onClick={() => this.removeBall(i)} key={i} radius={b * 0.8}></Ball>)}
+        <Container style={{position: 'absolute', display: 'flex', flexFlow: 'column', alignItems: 'center', left: canvasSize }}>
+          <Range vertical style={{height: 150}} min={5} max={40} value={[ballRadius]} onChange={(v) => this.setState({ ballRadius: v })} data-tip="Radius of dots to add"></Range>
+          <Button onClick={this.addBall.bind(this)}>Add Ball</Button>
+          {balls.map((b,i) => <Ball data-tip="Click on a ball to remove" onClick={() => this.removeBall(i)} key={i} radius={b * 0.8}></Ball>)}
         </Container>
         }
         <ReactTooltip multiline={true} />
