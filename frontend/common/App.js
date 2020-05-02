@@ -22,6 +22,7 @@ const Container = styled.div`
 `
 const Header = styled.div`
   position: relative;
+  background-color: #cccccccc;
 `
 const Canvas = styled.canvas`
   position: absolute;
@@ -159,7 +160,7 @@ class App extends React.Component {
 
     this.customVcc.onUpdate((newProps) => {
       if (newProps.value && newProps.value !== '') {
-        const {image, obstacles, path} = newProps.value;
+        const {image, obstacles, path, targetArea} = newProps.value;
         let o = this.state.obstacles;
         this.path = path;
 
@@ -170,8 +171,9 @@ class App extends React.Component {
 
         this.setState({
           ...this.state,
-          ...newProps,
+          ...newProps.value,
           obstacles: o,
+          targetArea: targetArea*100
         }, () => {
           this.setImage(image)
           this.drawPath()
@@ -241,18 +243,20 @@ class App extends React.Component {
 
   setImage(src, onLoad) {
     let img = new Image;
+    img.crossOrigin = "anonymous";
     img.onload = () => {
-      //this.setState({ image: img.src })
       const ctx = this.refs.canvas.getContext('2d');
       ctx.imageSmoothingQuality = 'high';
       ctx.clearRect(0, 0, GAME_SIZE, GAME_SIZE);
       let ratio = Math.min(1024 / img.width, 1024 / img.height);
-      const [w, h] = [img.width * ratio, img.height * ratio];
-      const [x, y] = [(1080 - w) / 2, (1080 - h) / 2];
+      const [w, h] = [Math.round(img.width * ratio), Math.round(img.height * ratio)];
+      const [x, y] = [Math.round((1080 - w) / 2), Math.round((1080 - h) / 2)];
       ctx.drawImage(img, 0, 0, img.width, img.height, x, y, w, h);
 
       if (onLoad)
         onLoad(this.refs.canvas, x, y, w, h);
+      else
+        this.setState({ image: img.src });
     }
     img.src = src;
   }
@@ -305,7 +309,7 @@ class App extends React.Component {
       c.width = w;
       c.height = h;
       c.getContext('2d').putImageData(imageContentRaw, 0, 0);
-      this.setState({ image: canvas.toDataURL() })
+      this.setState({ image: c.toDataURL() })
 
       this.runMarchingSquares()
     });
@@ -329,32 +333,15 @@ class App extends React.Component {
   saveLevel() {
     const {willScale, targetArea, balls, backgroundColor} = this.state;
     let obstacles = this.state.obstacles.map(({period,cycles})=>{return {period,cycles}});
-    /*let obstacles = this.state.obstacles.map(({period,cycles})=>{return {period,cycles,paths:[]}});
-    for (let p of this.paths) {
-      let obstacleIndex = p[1].index;
-      let ops = obstacles[obstacleIndex].paths;
-      ops.push([p[0], p[1]]);
-      let opsa = ops[ops.length-1];
-      for (let i=2; i<p.length; i++) {
-        let oi = p[i].index;
-        if (obstacleIndex === oi)
-          opsa.push(p[i])
-        else {
-          obstacleIndex = oi;
-          ops = obstacles[obstacleIndex].paths;
-          ops.push([p[i-1], p[i]]);
-          opsa = ops[ops.length-1];
-        }
-      }
-    }*/
-    //console.log({ image: this.state.image, obstacles, path: this.path, willScale, targetArea: targetArea/100, balls, backgroundColor });
 
-    let save = (url) => this.setState({ image: url, value: { image: url, obstacles, path: this.path, willScale, targetArea: targetArea/100, balls, backgroundColor } }, () => {
+    let save = (url) => this.setState({ image: url, value: { image: url, backgroundColor, willScale, targetArea: targetArea/100, balls, obstacles, path: this.path } }, () => {
       this.customVcc.change(this.state.value);
       this.customVcc.save();
+      console.log(this.state.value);
     });
 
     let url = this.state.image;
+    console.log(url)
     if (url.startsWith('data')) {  // data-url 
       this.customVcc.uploadFile(dataURLtoBlob(url), this.state.name + '.png', (url) => save(url));
     } else if ((url.match(/\.(jpeg|jpg|webm|png)$/) != null)) {  // image url
@@ -370,12 +357,16 @@ class App extends React.Component {
     return (
       <Container>
         <Header>
+        <span>
+          <label data-tip="Show/Hide obstacle layer">Show Obstacle Layer?<Checkbox checked={showOutline} onChange={(e) => this.setState({ showOutline: e.target.checked})}></Checkbox></label>
           <Button onClick={this.saveLevel.bind(this)}>Save Level</Button>
           <ButtonLabel>Select Image<FileInput id="file" onChange={this.handleImage.bind(this)}></FileInput></ButtonLabel>
-          <label data-tip="Show/Hide obstacle layer">Show Obstacle Layer?<Checkbox checked={showOutline} onChange={(e) => this.setState({ showOutline: e.target.checked})}></Checkbox></label>
+        </span>
+        <span>
           <ColorPicker data-tip="Level background color" value={backgroundColor} onChange={e => this.setState({backgroundColor: e.target.value})}></ColorPicker>
           <label data-tip="Whether image will continuously<br/>scale to fill the level">Scaling?<Checkbox checked={willScale} onChange={(e) => this.setState({ willScale: e.target.checked})}></Checkbox></label>
           <RangeInput min={1} max={99} value={targetArea} onChange={(e) => this.setState({ targetArea: e.target.value })} data-tip="Target area % to pass level"></RangeInput>
+        </span>
           <div>
           <RangeInput min={3} max={64} value={brushRadius} onChange={(e) => this.setState({ brushRadius: e.target.value })} data-tip="Brush size"></RangeInput>
           {this.state.obstacles.map((c, i) =>
@@ -410,9 +401,9 @@ class App extends React.Component {
         </Container>
         {
         <Container style={{position: 'absolute', display: 'flex', flexFlow: 'column', alignItems: 'center', left: canvasSize }}>
-          <Range vertical style={{height: 150}} min={5} max={40} value={[ballRadius]} onChange={(v) => this.setState({ ballRadius: v })} data-tip="Radius of dots to add"></Range>
+          <Range vertical style={{height: 150}} min={5} max={40} value={[ballRadius]} onChange={(v) => this.setState({ ballRadius: v[0] })} data-tip="Radius of dots to add"></Range>
           <Button onClick={this.addBall.bind(this)}>Add Ball</Button>
-          {balls.map((b,i) => <Ball data-tip="Click on a ball to remove" onClick={() => this.removeBall(i)} key={i} radius={b * 0.8}></Ball>)}
+          {balls.map((b,i) => <Ball data-tip="Click on a ball to remove" onClick={() => this.removeBall(i)} key={i} radius={b * canvasSize / GAME_SIZE}></Ball>)}
         </Container>
         }
         <ReactTooltip multiline={true} />
