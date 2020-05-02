@@ -242,7 +242,7 @@ class App extends React.Component {
   setImage(src, onLoad) {
     let img = new Image;
     img.onload = () => {
-      this.setState({ image: img.src })
+      //this.setState({ image: img.src })
       const ctx = this.refs.canvas.getContext('2d');
       ctx.imageSmoothingQuality = 'high';
       ctx.clearRect(0, 0, GAME_SIZE, GAME_SIZE);
@@ -252,7 +252,7 @@ class App extends React.Component {
       ctx.drawImage(img, 0, 0, img.width, img.height, x, y, w, h);
 
       if (onLoad)
-        onLoad()
+        onLoad(this.refs.canvas, x, y, w, h);
     }
     img.src = src;
   }
@@ -299,7 +299,16 @@ class App extends React.Component {
 
    handleImage(e) {
     let reader = new FileReader();
-    reader.onload = (e) => this.setImage(e.target.result, () => this.runMarchingSquares());
+    reader.onload = (e) => this.setImage(e.target.result, (canvas, x, y, w, h) => {
+      let imageContentRaw = canvas.getContext('2d').getImageData(x,y,w,h);
+      let c = document.createElement('canvas');
+      c.width = w;
+      c.height = h;
+      c.getContext('2d').putImageData(imageContentRaw, 0, 0);
+      this.setState({ image: canvas.toDataURL() })
+
+      this.runMarchingSquares()
+    });
     reader.readAsDataURL(e.target.files[0]);
   }
 
