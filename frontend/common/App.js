@@ -8,11 +8,11 @@ import CustomVcc from '@withkoji/custom-vcc-sdk';
 import ReactTooltip from 'react-tooltip'
 import {Range, Handle} from 'rc-slider';
 
-const handle = (props) => {
+const handle = (postfix) => (props) => {
   const { value, dragging, index, ...rest } = props;
   return (
     <Handle style={{display: 'flex', justifyContent: 'center'}} key={index} value={value} {...rest}>
-      {dragging && <div style={{width: '4em', background: '#eeee', marginTop: '-1.5em', whiteSpace: 'nowrap', userSelect: 'none'}}>{value} ms</div>}
+      {dragging && <div style={{width: '4em', background: '#eeee', marginTop: '-1.5em', whiteSpace: 'nowrap', userSelect: 'none'}}>{value} {postfix}</div>}
     </Handle>
   );
 };
@@ -30,7 +30,7 @@ const Canvas = styled.canvas`
   width: 80vh;
   height: 80vh;
 `
-const FileInput = styled.input.attrs(props => ({
+const FileInput = styled.input.attrs(_props => ({
   type: "file",
 }))`
   opacity: 0;
@@ -38,12 +38,12 @@ const FileInput = styled.input.attrs(props => ({
   z-index: -1;
 `;
 
-const Checkbox = styled.input.attrs(props => ({
+const Checkbox = styled.input.attrs(_props => ({
   type: "checkbox",
 }))`
 `;
 
-const NumberInput = styled.input.attrs(props => ({
+const NumberInput = styled.input.attrs(_props => ({
   type: "number",
   min: 0,
   max: 10000
@@ -95,11 +95,11 @@ const Ball = styled.div`
   border-radius: ${p => p.radius}px;
   width: ${p => p.radius*2}px;
   height: ${p => p.radius*2}px;
-  color: white;
+  background-color: white;
   border: solid 1px black;
 `
 
-const ColorPicker = styled.input.attrs(props => ({
+const ColorPicker = styled.input.attrs(_props => ({
   type: "color",
 }))`
   border: 2px solid #666;
@@ -113,10 +113,6 @@ const ColorPicker = styled.input.attrs(props => ({
   }
 `
 
-const RangeInput = styled.input.attrs(props => ({
-  type: "range",
-}))`
-`
 
 function dataURLtoBlob(dataurl) {
   var arr = dataurl.split(','), mime = arr[0].match(/:(.*?);/)[1],
@@ -188,7 +184,7 @@ class App extends React.Component {
     this.setState({canvasSize: this.refs.canvas.getBoundingClientRect().width});
   }
 
-  runMarchingSquares(point = undefined) {
+  runMarchingSquares(_point = undefined) {
     this.path = this.ms.getBlobOutlinePoints(this.refs.canvas, SCALE)
     this.drawPath();
   }
@@ -353,22 +349,27 @@ class App extends React.Component {
     const { image, obstacles, selected, brushRadius, willScale, targetArea, ballRadius, balls, backgroundColor, showOutline, canvasSize} = this.state;
     const {cycles,period,disabled,color} = obstacles[selected];
     const railStyle = { backgroundColor: 'lightgray' };
+    const handle_px = handle("px");
     //const ratio = canvasSize / GAME_SIZE;
     return (
       <Container>
         <Header>
-        <span>
+          <div style={{display: "inline-block", backgroundColor: "#ddddffdd"}}>
           <label data-tip="Show/Hide obstacle layer">Show Obstacle Layer?<Checkbox checked={showOutline} onChange={(e) => this.setState({ showOutline: e.target.checked})}></Checkbox></label>
           <Button onClick={this.saveLevel.bind(this)}>Save Level</Button>
-          <ButtonLabel>Select Image<FileInput id="file" onChange={this.handleImage.bind(this)}></FileInput></ButtonLabel>
-        </span>
-        <span>
+          <ButtonLabel data-tip="An image with transparency<br/>as game area for edge detection">Select Image<FileInput id="file" onChange={this.handleImage.bind(this)}></FileInput></ButtonLabel>
+          </div>
+          <div style={{display: "inline-block", backgroundColor: "#ffdddddd", verticalAlign: "bottom"}}>
           <ColorPicker data-tip="Level background color" value={backgroundColor} onChange={e => this.setState({backgroundColor: e.target.value})}></ColorPicker>
           <label data-tip="Whether image will continuously<br/>scale to fill the level">Scaling?<Checkbox checked={willScale} onChange={(e) => this.setState({ willScale: e.target.checked})}></Checkbox></label>
-          <RangeInput min={1} max={99} value={targetArea} onChange={(e) => this.setState({ targetArea: e.target.value })} data-tip="Target area % to pass level"></RangeInput>
-        </span>
+          <div style={{ display: 'inline-block', width: '150px' }} data-tip="Target area % to pass level">
+          <Range min={1} max={99} value={[targetArea]} handle={handle('%')} onChange={(v) => this.setState({ targetArea: v })}></Range>
+          </div>
+          </div>
           <div>
-          <RangeInput min={3} max={64} value={brushRadius} onChange={(e) => this.setState({ brushRadius: e.target.value })} data-tip="Brush size"></RangeInput>
+          <div style={{ display: 'inline-block', width: '150px' }} data-tip="Brush size">
+          <Range min={3} max={64} value={[brushRadius]} handle={handle_px} onChange={(v) => this.setState({ brushRadius: v })}></Range>
+          </div>
           {this.state.obstacles.map((c, i) =>
             <ColorInput key={i} color={c.color} value={i} data-tip={c.tip}
               checked={this.state.selected == i} onChange={this.handleRadio.bind(this)}
@@ -382,8 +383,8 @@ class App extends React.Component {
           <div style={{ display: 'inline-block', width: '300px' }}
             data-tip="VISIBLE in painted time-range<br/>INVISIBLE on gray>">
             <Range count={cycles.length} value={cycles} min={0} max={period} step={STEP} disabled={disabled}
-              onChange={this.changeCycles.bind(this)}
-              pushable handle={handle} trackStyle={[, railStyle,]} railStyle={railStyle} />
+              onChange={this.changeCycles.bind(this)} postfix={"ms"}
+              pushable handle={handle("ms")} trackStyle={[, railStyle,]} railStyle={railStyle} />
           </div>
           <Button disabled={disabled} onClick={this.addCycle.bind(this)}
           data-tip="Add INVISIBLE/VISIBLE cycle to tail">+</Button>
@@ -401,18 +402,18 @@ class App extends React.Component {
         </Container>
         {
         <Container style={{position: 'absolute', display: 'flex', flexFlow: 'column', alignItems: 'center', left: canvasSize }}>
-          <Range vertical style={{height: 150}} min={5} max={40} value={[ballRadius]} onChange={(v) => this.setState({ ballRadius: v[0] })} data-tip="Radius of dots to add"></Range>
+          <div style={{ display: 'inline-block', height: '150px' }} data-tip="Radius of balls to add">
+          <Range vertical min={10} max={40} value={[ballRadius]} handle={handle_px}
+          onChange={(v) => this.setState({ ballRadius: v })} ></Range>
+          </div>
           <Button onClick={this.addBall.bind(this)}>Add Ball</Button>
           {balls.map((b,i) => <Ball data-tip="Click on a ball to remove" onClick={() => this.removeBall(i)} key={i} radius={b * canvasSize / GAME_SIZE}></Ball>)}
         </Container>
         }
-        <ReactTooltip multiline={true} />
+        <ReactTooltip place="bottom" multiline={true} />
       </Container>
     );
   }
 }
-//<label data-tip="Time when obstacle is VISIBLE <br/>(in miliseconds)">On:<NumberInput value={on} disabled={disabled} onChange={(e) => this.handleValue(e, 'on')}></NumberInput></label>
-//<label data-tip="Time when obstacle is INVISIBLE <br/>(in miliseconds)">Off:<NumberInput value={off} disabled={disabled} onChange={(e) => this.handleValue(e, 'off')}></NumberInput></label>
-//<label data-tip="Whether INVISIBLE in the BEGINNING or NOT">Start Off:<Checkbox checked={startOff} disabled={disabled} onChange={(e) => this.handleValue(e, 'startOff', 'checked')}></Checkbox></label>
 
 export default App;
